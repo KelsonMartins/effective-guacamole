@@ -1,0 +1,10 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Guacamole.Mediator/Guacamole.Mediator.csproj" />
+    <Project Path="src/Guacamole.ObjectMapper/Guacamole.ObjectMapper.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Guacamole.Mediator.Tests/Guacamole.Mediator.Tests.csproj" />
+    <Project Path="tests/Guacamole.ObjectMapper.Tests/Guacamole.ObjectMapper.Tests.csproj" />
+  </Folder>
+</Solution>

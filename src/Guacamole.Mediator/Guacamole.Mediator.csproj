@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <PackageId>Guacamole.Mediator</PackageId>
+    <IsPackable>true</IsPackable>
+    <Description>A lightweight mediator pattern implementation for .NET. Supports request/response and fire-and-forget patterns with automatic handler discovery via dependency injection.</Description>
+    <PackageTags>mediator;cqrs;request;handler;pattern;di</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.0" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <PackageId>Guacamole.ObjectMapper</PackageId>
+    <IsPackable>true</IsPackable>
+    <Description>A high-performance, convention-based object mapper for .NET. Supports profile-driven configuration, ForMember/Ignore/ReverseMap, collection mapping, circular reference detection, and enum conversion.</Description>
+    <PackageTags>mapper;object-mapper;mapping;dto;convention;profile</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.0" />
+  </ItemGroup>
+
+</Project>
