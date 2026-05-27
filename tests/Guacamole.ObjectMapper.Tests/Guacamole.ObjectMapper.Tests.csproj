@@ -5,6 +5,7 @@
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
     <NoWarn>1591</NoWarn>
+    <TestingPlatformDotnetTestSupport>true</TestingPlatformDotnetTestSupport>
   </PropertyGroup>
 
   <ItemGroup>
