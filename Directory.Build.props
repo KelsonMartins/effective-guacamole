@@ -15,11 +15,4 @@
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
   </PropertyGroup>
 
-  <!-- Use project-level README if present, otherwise fall back to repo root README -->
-  <ItemGroup Condition="'$(IsPackable)' == 'true'">
-    <None Include="$(MSBuildProjectDirectory)README.md" Pack="true" PackagePath="\"
-          Condition="Exists('$(MSBuildProjectDirectory)README.md')" />
-    <None Include="$(MSBuildThisFileDirectory)README.md" Pack="true" PackagePath="\"
-          Condition="!Exists('$(MSBuildProjectDirectory)README.md') AND Exists('$(MSBuildThisFileDirectory)README.md')" />
-  </ItemGroup>
 </Project>
