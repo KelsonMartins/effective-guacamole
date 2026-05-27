@@ -6,20 +6,16 @@ namespace Guacamole.Mediator.Tests;
 
 // Handlers defined in SenderTests.cs are re-used for assembly scanning.
 
-public class ServiceCollectionExtensionsTests : IDisposable
+public class ServiceCollectionExtensionsTests
 {
-    private ServiceProvider? _provider;
-
-    public void Dispose() => _provider?.Dispose();
-
     [Test]
     public async Task AddMediator_ScansAssembly_RegistersResponseHandler()
     {
         var services = new ServiceCollection();
         services.AddMediator(typeof(PingHandler).Assembly);
-        _provider = services.BuildServiceProvider();
+        using var provider = services.BuildServiceProvider();
 
-        var handler = _provider.GetService<IRequestHandler<PingQuery, string>>();
+        var handler = provider.GetService<IRequestHandler<PingQuery, string>>();
 
         await Assert.That(handler).IsNotNull();
         await Assert.That(handler).IsTypeOf<PingHandler>();
@@ -30,9 +26,9 @@ public class ServiceCollectionExtensionsTests : IDisposable
     {
         var services = new ServiceCollection();
         services.AddMediator(typeof(FireHandler).Assembly);
-        _provider = services.BuildServiceProvider();
+        using var provider = services.BuildServiceProvider();
 
-        var handler = _provider.GetService<IRequestHandler<FireCommand>>();
+        var handler = provider.GetService<IRequestHandler<FireCommand>>();
 
         await Assert.That(handler).IsNotNull();
         await Assert.That(handler).IsTypeOf<FireHandler>();
@@ -43,9 +39,9 @@ public class ServiceCollectionExtensionsTests : IDisposable
     {
         var services = new ServiceCollection();
         services.AddMediator(typeof(PingHandler).Assembly);
-        _provider = services.BuildServiceProvider();
+        using var provider = services.BuildServiceProvider();
 
-        var mediator = _provider.GetService<IMediator>();
+        var mediator = provider.GetService<IMediator>();
 
         await Assert.That(mediator).IsNotNull();
         await Assert.That(mediator).IsTypeOf<Sender>();
@@ -56,10 +52,10 @@ public class ServiceCollectionExtensionsTests : IDisposable
     {
         var services = new ServiceCollection();
         services.AddMediator(typeof(PingHandler).Assembly, typeof(FireHandler).Assembly);
-        _provider = services.BuildServiceProvider();
+        using var provider = services.BuildServiceProvider();
 
-        var responseHandler = _provider.GetService<IRequestHandler<PingQuery, string>>();
-        var voidHandler = _provider.GetService<IRequestHandler<FireCommand>>();
+        var responseHandler = provider.GetService<IRequestHandler<PingQuery, string>>();
+        var voidHandler = provider.GetService<IRequestHandler<FireCommand>>();
 
         await Assert.That(responseHandler).IsNotNull();
         await Assert.That(voidHandler).IsNotNull();

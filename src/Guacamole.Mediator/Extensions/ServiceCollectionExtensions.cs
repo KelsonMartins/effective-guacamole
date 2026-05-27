@@ -9,46 +9,71 @@ namespace Guacamole.Mediator.Extensions;
 /// </summary>
 public static class ServiceCollectionExtensions
 {
-    /// <summary>
-    /// Registers <see cref="IMediator"/> and scans <paramref name="assembly"/> for all
-    /// <see cref="IRequestHandler{TRequest,TResponse}"/> and <see cref="IRequestHandler{TRequest}"/>
-    /// implementations, registering them as scoped services.
-    /// </summary>
-    public static IServiceCollection AddMediator(this IServiceCollection services, Assembly assembly)
+    extension(IServiceCollection services)
     {
-        services.AddScoped<IMediator, Sender>();
-
-        RegisterHandlers(services, assembly, typeof(IRequestHandler<,>));
-        RegisterHandlers(services, assembly, typeof(IRequestHandler<>));
-
-        return services;
-    }
-
-    /// <summary>
-    /// Registers <see cref="IMediator"/> and scans multiple assemblies for all handler implementations.
-    /// </summary>
-    public static IServiceCollection AddMediator(this IServiceCollection services, params Assembly[] assemblies)
-    {
-        services.AddScoped<IMediator, Sender>();
-
-        foreach (var assembly in assemblies)
+        /// <summary>
+        /// Registers <see cref="IMediator"/> and scans <paramref name="assembly"/> for all
+        /// <see cref="IRequestHandler{TRequest,TResponse}"/> and <see cref="IRequestHandler{TRequest}"/>
+        /// implementations, registering them as scoped services.
+        /// </summary>
+        public IServiceCollection AddMediator(Assembly assembly)
         {
-            RegisterHandlers(services, assembly, typeof(IRequestHandler<,>));
-            RegisterHandlers(services, assembly, typeof(IRequestHandler<>));
+            services.AddScoped<IMediator, Sender>();
+
+            var handlerInterface = typeof(IRequestHandler<,>);
+            var handlers = assembly.GetTypes()
+                .Where(t => !t.IsAbstract && !t.IsInterface)
+                .SelectMany(t => t.GetInterfaces()
+                    .Where(i => i.IsGenericType && i.GetGenericTypeDefinition() == handlerInterface)
+                    .Select(i => new { Interface = i, Implementation = t }));
+
+            foreach (var h in handlers)
+                services.AddScoped(h.Interface, h.Implementation);
+
+            var singleHandlerInterface = typeof(IRequestHandler<>);
+            var singleHandlers = assembly.GetTypes()
+                .Where(t => !t.IsAbstract && !t.IsInterface)
+                .SelectMany(t => t.GetInterfaces()
+                    .Where(i => i.IsGenericType && i.GetGenericTypeDefinition() == singleHandlerInterface)
+                    .Select(i => new { Interface = i, Implementation = t }));
+
+            foreach (var h in singleHandlers)
+                services.AddScoped(h.Interface, h.Implementation);
+
+            return services;
         }
 
-        return services;
-    }
+        /// <summary>
+        /// Registers <see cref="IMediator"/> and scans multiple assemblies for all handler implementations.
+        /// </summary>
+        public IServiceCollection AddMediator(params Assembly[] assemblies)
+        {
+            services.AddScoped<IMediator, Sender>();
 
-    private static void RegisterHandlers(IServiceCollection services, Assembly assembly, Type handlerInterface)
-    {
-        var handlers = assembly.GetTypes()
-            .Where(t => !t.IsAbstract && !t.IsInterface)
-            .SelectMany(t => t.GetInterfaces()
-                .Where(i => i.IsGenericType && i.GetGenericTypeDefinition() == handlerInterface)
-                .Select(i => new { Interface = i, Implementation = t }));
+            foreach (var assembly in assemblies)
+            {
+                var handlerInterface = typeof(IRequestHandler<,>);
+                var handlers = assembly.GetTypes()
+                    .Where(t => !t.IsAbstract && !t.IsInterface)
+                    .SelectMany(t => t.GetInterfaces()
+                        .Where(i => i.IsGenericType && i.GetGenericTypeDefinition() == handlerInterface)
+                        .Select(i => new { Interface = i, Implementation = t }));
 
-        foreach (var h in handlers)
-            services.AddScoped(h.Interface, h.Implementation);
+                foreach (var h in handlers)
+                    services.AddScoped(h.Interface, h.Implementation);
+
+                var singleHandlerInterface = typeof(IRequestHandler<>);
+                var singleHandlers = assembly.GetTypes()
+                    .Where(t => !t.IsAbstract && !t.IsInterface)
+                    .SelectMany(t => t.GetInterfaces()
+                        .Where(i => i.IsGenericType && i.GetGenericTypeDefinition() == singleHandlerInterface)
+                        .Select(i => new { Interface = i, Implementation = t }));
+
+                foreach (var h in singleHandlers)
+                    services.AddScoped(h.Interface, h.Implementation);
+            }
+
+            return services;
+        }
     }
 }

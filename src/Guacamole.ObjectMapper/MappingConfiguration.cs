@@ -20,8 +20,8 @@ public sealed class MappingConfiguration
     public TypeMappingConfiguration<TSource, TDestination>? GetTypeMapping<TSource, TDestination>()
         where TSource : class
         where TDestination : class
-        => _typeMappings.TryGetValue((typeof(TSource), typeof(TDestination)), out var m)
-            ? m as TypeMappingConfiguration<TSource, TDestination>
+        => _typeMappings.TryGetValue((typeof(TSource), typeof(TDestination)), out var mapping)
+            ? mapping as TypeMappingConfiguration<TSource, TDestination>
             : null;
 
     /// <summary>Returns a compiled mapper function for the given type pair, or <c>null</c> if none.</summary>

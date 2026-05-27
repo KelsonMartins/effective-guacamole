@@ -1,9 +1,15 @@
 namespace Guacamole.ObjectMapper.Tests;
 
+/// <summary>
+/// Unit tests for convention-based object mapping.
+/// </summary>
 public class ConventionMappingTests
 {
     private readonly ObjectMapper _mapper;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="ConventionMappingTests"/> class.
+    /// </summary>
     public ConventionMappingTests()
     {
         var builder = new MappingConfigurationBuilder();
@@ -11,6 +17,9 @@ public class ConventionMappingTests
         _mapper = new ObjectMapper(builder.Build());
     }
 
+    /// <summary>
+    /// Tests that scalar properties are mapped by name.
+    /// </summary>
     [Test]
     public async Task Map_ScalarProperties_MappedByName()
     {
@@ -25,6 +34,9 @@ public class ConventionMappingTests
         await Assert.That(dst.Balance).IsEqualTo(9.99m);
     }
 
+    /// <summary>
+    /// Tests that enum properties are mapped by their underlying value.
+    /// </summary>
     [Test]
     public async Task Map_EnumProperty_MappedByUnderlyingValue()
     {
@@ -35,6 +47,9 @@ public class ConventionMappingTests
         await Assert.That(dst.Status).IsEqualTo(Status.Pending);
     }
 
+    /// <summary>
+    /// Tests that mapping a null source returns a default instance.
+    /// </summary>
     [Test]
     public async Task Map_NullSource_ReturnsDefaultInstance()
     {
@@ -43,6 +58,9 @@ public class ConventionMappingTests
         await Assert.That(dst).IsNotNull();
     }
 
+    /// <summary>
+    /// Tests that mapping with an explicit type pair works.
+    /// </summary>
     [Test]
     public async Task Map_ExplicitTypePair_Works()
     {
@@ -53,6 +71,9 @@ public class ConventionMappingTests
         await Assert.That(dst.Name).IsEqualTo("Bob");
     }
 
+    /// <summary>
+    /// Tests that mapping to an existing instance overwrites its properties.
+    /// </summary>
     [Test]
     public async Task Map_ToExistingInstance_OverwritesProperties()
     {
@@ -65,6 +86,9 @@ public class ConventionMappingTests
         await Assert.That(dst.Age).IsEqualTo(99);
     }
 
+    /// <summary>
+    /// Tests that mapping an IEnumerable maps all elements.
+    /// </summary>
     [Test]
     public async Task Map_IEnumerable_MapsAllElements()
     {
@@ -81,6 +105,9 @@ public class ConventionMappingTests
         await Assert.That(results[1].Name).IsEqualTo("B");
     }
 
+    /// <summary>
+    /// Tests that nested complex objects are mapped by convention.
+    /// </summary>
     [Test]
     public async Task Map_NestedComplexObject_MappedByConvention()
     {
@@ -96,6 +123,9 @@ public class ConventionMappingTests
         await Assert.That(dst.Address.City).IsEqualTo("Springfield");
     }
 
+    /// <summary>
+    /// Tests that ReverseMap maps back to the source type.
+    /// </summary>
     [Test]
     public async Task ReverseMap_MapsBackToSource()
     {

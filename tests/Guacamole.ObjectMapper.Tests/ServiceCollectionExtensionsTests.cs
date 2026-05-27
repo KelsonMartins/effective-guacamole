@@ -17,20 +17,16 @@ public class SimpleProfile : MappingProfile
 
 // ---------- tests ----------
 
-public class ServiceCollectionExtensionsTests : IDisposable
+public class ServiceCollectionExtensionsTests
 {
-    private ServiceProvider? _provider;
-
-    public void Dispose() => _provider?.Dispose();
-
     [Test]
     public async Task AddObjectMapper_NoArgs_RegistersMapper()
     {
         var services = new ServiceCollection();
         services.AddObjectMapper();
-        _provider = services.BuildServiceProvider();
+        using var provider = services.BuildServiceProvider();
 
-        var mapper = _provider.GetService<IObjectMapper>();
+        var mapper = provider.GetService<IObjectMapper>();
 
         await Assert.That(mapper).IsNotNull();
     }
@@ -40,9 +36,9 @@ public class ServiceCollectionExtensionsTests : IDisposable
     {
         var services = new ServiceCollection();
         services.AddObjectMapper(new SimpleProfile());
-        _provider = services.BuildServiceProvider();
+        using var provider = services.BuildServiceProvider();
 
-        var mapper = _provider.GetRequiredService<IObjectMapper>();
+        var mapper = provider.GetRequiredService<IObjectMapper>();
         var dst = mapper.Map<Destination>(new Source { Name = "DI", Age = 5 });
 
         await Assert.That(dst.Name).IsEqualTo("DI");
@@ -54,9 +50,9 @@ public class ServiceCollectionExtensionsTests : IDisposable
     {
         var services = new ServiceCollection();
         services.AddObjectMapper(typeof(SimpleProfile).Assembly);
-        _provider = services.BuildServiceProvider();
+        using var provider = services.BuildServiceProvider();
 
-        var mapper = _provider.GetRequiredService<IObjectMapper>();
+        var mapper = provider.GetRequiredService<IObjectMapper>();
         var dst = mapper.Map<Destination>(new Source { Name = "Scanned" });
 
         await Assert.That(dst.Name).IsEqualTo("Scanned");
@@ -67,9 +63,9 @@ public class ServiceCollectionExtensionsTests : IDisposable
     {
         var services = new ServiceCollection();
         services.AddObjectMapper(cfg => cfg.CreateMap<Source, Destination>());
-        _provider = services.BuildServiceProvider();
+        using var provider = services.BuildServiceProvider();
 
-        var mapper = _provider.GetRequiredService<IObjectMapper>();
+        var mapper = provider.GetRequiredService<IObjectMapper>();
         var dst = mapper.Map<Destination>(new Source { Name = "Inline", Age = 7 });
 
         await Assert.That(dst.Name).IsEqualTo("Inline");
@@ -81,10 +77,10 @@ public class ServiceCollectionExtensionsTests : IDisposable
     {
         var services = new ServiceCollection();
         services.AddObjectMapper();
-        _provider = services.BuildServiceProvider();
+        using var provider = services.BuildServiceProvider();
 
-        using var scope1 = _provider.CreateScope();
-        using var scope2 = _provider.CreateScope();
+        using var scope1 = provider.CreateScope();
+        using var scope2 = provider.CreateScope();
 
         var m1 = scope1.ServiceProvider.GetRequiredService<IObjectMapper>();
         var m2 = scope2.ServiceProvider.GetRequiredService<IObjectMapper>();
@@ -92,6 +88,6 @@ public class ServiceCollectionExtensionsTests : IDisposable
         await Assert.That(m1).IsNotNull();
         await Assert.That(m2).IsNotNull();
         // Different scopes = different instances
-        await Assert.That(ReferenceEquals(m1, m2)).IsEqualTo(false);
+        await Assert.That(ReferenceEquals(m1, m2)).IsFalse();
     }
 }

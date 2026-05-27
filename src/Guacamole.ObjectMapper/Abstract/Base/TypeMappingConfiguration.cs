@@ -1,5 +1,3 @@
-using Guacamole.ObjectMapper;
-
 namespace Guacamole.ObjectMapper.Abstract.Base;
 
 /// <summary>

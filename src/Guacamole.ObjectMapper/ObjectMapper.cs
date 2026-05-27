@@ -8,16 +8,11 @@ namespace Guacamole.ObjectMapper;
 /// High-performance object mapper with compiled expression caching, convention-based mapping,
 /// circular-reference detection, and support for paged/collection types.
 /// </summary>
-public sealed class ObjectMapper : IObjectMapper
+/// <param name="configuration">The compiled mapping configuration produced by <see cref="MappingConfigurationBuilder.Build"/>.</param>
+public sealed class ObjectMapper(MappingConfiguration configuration) : IObjectMapper
 {
-    private readonly MappingConfiguration _configuration;
+    private readonly MappingConfiguration _configuration = configuration;
     private readonly ConcurrentDictionary<(Type, Type), Func<object, object>> _compiledMappers = new();
-
-    /// <param name="configuration">The compiled mapping configuration produced by <see cref="MappingConfigurationBuilder.Build"/>.</param>
-    public ObjectMapper(MappingConfiguration configuration)
-    {
-        _configuration = configuration;
-    }
 
     /// <inheritdoc />
     public TDestination Map<TDestination>(object? source) where TDestination : class

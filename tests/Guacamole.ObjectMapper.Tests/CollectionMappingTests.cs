@@ -3,10 +3,16 @@ using Guacamole.ObjectMapper.Abstract.Base;
 
 namespace Guacamole.ObjectMapper.Tests;
 
+/// <summary>
+/// Unit tests for collection mapping scenarios.
+/// </summary>
 public class CollectionMappingTests
 {
     private readonly ObjectMapper _mapper;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="CollectionMappingTests"/> class.
+    /// </summary>
     public CollectionMappingTests()
     {
         var builder = new MappingConfigurationBuilder();
@@ -15,6 +21,9 @@ public class CollectionMappingTests
         _mapper = new ObjectMapper(builder.Build());
     }
 
+    /// <summary>
+    /// Tests mapping a list of sources returns a list of destinations.
+    /// </summary>
     [Test]
     public async Task Map_ListOfSources_ReturnsListOfDestinations()
     {
@@ -31,6 +40,9 @@ public class CollectionMappingTests
         await Assert.That(dests[2].Name).IsEqualTo("Z");
     }
 
+    /// <summary>
+    /// Tests mapping a null collection returns an empty result.
+    /// </summary>
     [Test]
     public async Task Map_NullCollection_ReturnsEmpty()
     {
@@ -39,6 +51,9 @@ public class CollectionMappingTests
         await Assert.That(result.Count).IsEqualTo(0);
     }
 
+    /// <summary>
+    /// Tests mapping an empty collection returns an empty result.
+    /// </summary>
     [Test]
     public async Task Map_EmptyCollection_ReturnsEmpty()
     {
@@ -47,6 +62,9 @@ public class CollectionMappingTests
         await Assert.That(result.Count).IsEqualTo(0);
     }
 
+    /// <summary>
+    /// Tests mapping a nested collection property maps each element.
+    /// </summary>
     [Test]
     public async Task Map_NestedCollectionProperty_MapsEachElement()
     {
@@ -62,6 +80,9 @@ public class CollectionMappingTests
         await Assert.That(dst.Tags[1].Value).IsEqualTo("beta");
     }
 
+    /// <summary>
+    /// Tests mapping an array source maps to a list destination.
+    /// </summary>
     [Test]
     public async Task Map_ArraySource_MapsToListDestination()
     {

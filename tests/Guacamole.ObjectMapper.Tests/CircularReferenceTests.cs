@@ -5,8 +5,12 @@ namespace Guacamole.ObjectMapper.Tests;
 
 // ---------- profiles ----------
 
+/// <summary>
+/// Mapping profile for parent/child circular reference tests.
+/// </summary>
 public class ParentChildProfile : MappingProfile
 {
+    /// <inheritdoc />
     public override void Configure(IMappingConfigurationBuilder builder)
     {
         builder.CreateMap<Parent, ParentDto>();
@@ -16,10 +20,16 @@ public class ParentChildProfile : MappingProfile
 
 // ---------- tests ----------
 
+/// <summary>
+/// Unit tests for circular reference mapping.
+/// </summary>
 public class CircularReferenceTests
 {
     private readonly ObjectMapper _mapper;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="CircularReferenceTests"/> class.
+    /// </summary>
     public CircularReferenceTests()
     {
         var builder = new MappingConfigurationBuilder();
@@ -27,6 +37,9 @@ public class CircularReferenceTests
         _mapper = new ObjectMapper(builder.Build());
     }
 
+    /// <summary>
+    /// Tests mapping a parent with children does not throw.
+    /// </summary>
     [Test]
     public async Task Map_ParentWithChildren_DoesNotThrow()
     {
@@ -42,6 +55,9 @@ public class CircularReferenceTests
         await Assert.That(dto.Name).IsEqualTo("Root");
     }
 
+    /// <summary>
+    /// Tests mapping a parent with children maps child names.
+    /// </summary>
     [Test]
     public async Task Map_ParentWithChildren_MapsChildNames()
     {
@@ -56,6 +72,9 @@ public class CircularReferenceTests
         await Assert.That(dto.Children[1].Name).IsEqualTo("C2");
     }
 
+    /// <summary>
+    /// Tests mapping a deeply nested circular reference does not stack overflow.
+    /// </summary>
     [Test]
     public async Task Map_DeeplyNestedCircularRef_DoesNotStackOverflow()
     {
@@ -69,6 +88,9 @@ public class CircularReferenceTests
         await Assert.That(dto).IsNotNull();
     }
 
+    /// <summary>
+    /// Tests convention-based mapping of circular references does not throw.
+    /// </summary>
     [Test]
     public async Task Map_ConventionBased_CircularRef_DoesNotThrow()
     {

@@ -8,6 +8,7 @@ namespace Guacamole.Mediator;
 /// </summary>
 public sealed class Sender(IServiceProvider provider) : IMediator
 {
+    /// <inheritdoc/>
     public async Task<TResponse> Send<TResponse>(IRequest<TResponse> request, CancellationToken cancellationToken = default)
     {
         var requestType = request.GetType();
@@ -20,6 +21,7 @@ public sealed class Sender(IServiceProvider provider) : IMediator
         return await ((dynamic)handler).Handle((dynamic)request, cancellationToken);
     }
 
+    /// <inheritdoc/>
     public async Task Send(IRequest request, CancellationToken cancellationToken = default)
     {
         var requestType = request.GetType();

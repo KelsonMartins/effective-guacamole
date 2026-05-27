@@ -5,22 +5,32 @@ namespace Guacamole.ObjectMapper.Tests;
 
 // ---------- profile ----------
 
+/// <summary>
+/// Mapping profile for <see cref="Product"/> to <see cref="ProductDto"/>.
+/// </summary>
 public class ProductProfile : MappingProfile
 {
+    /// <inheritdoc />
     public override void Configure(IMappingConfigurationBuilder builder)
     {
         builder.CreateMap<Product, ProductDto>()
-               .ForMember(dst => dst.Label, src => src.Code)
+             .ForMember<string>(dst => dst.Label, src => src.Code)
                .Ignore(dst => dst.InternalNotes);
     }
 }
 
 // ---------- tests ----------
 
+/// <summary>
+/// Unit tests for mapping profiles.
+/// </summary>
 public class ProfileMappingTests
 {
     private readonly ObjectMapper _mapper;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="ProfileMappingTests"/> class.
+    /// </summary>
     public ProfileMappingTests()
     {
         var builder = new MappingConfigurationBuilder();
@@ -28,6 +38,9 @@ public class ProfileMappingTests
         _mapper = new ObjectMapper(builder.Build());
     }
 
+    /// <summary>
+    /// Tests ForMember maps from the specified source property.
+    /// </summary>
     [Test]
     public async Task ForMember_MapsFromSpecifiedSourceProperty()
     {
@@ -38,6 +51,9 @@ public class ProfileMappingTests
         await Assert.That(dto.Label).IsEqualTo("SKU-001");
     }
 
+    /// <summary>
+    /// Tests Ignore excludes a property from mapping.
+    /// </summary>
     [Test]
     public async Task Ignore_ExcludesPropertyFromMapping()
     {
@@ -48,6 +64,9 @@ public class ProfileMappingTests
         await Assert.That(dto.InternalNotes).IsEqualTo(string.Empty);
     }
 
+    /// <summary>
+    /// Tests convention fallback maps unspecified properties.
+    /// </summary>
     [Test]
     public async Task Profile_ConventionFallback_MapsUnspecifiedProperties()
     {
@@ -59,12 +78,15 @@ public class ProfileMappingTests
         await Assert.That(dto.Price).IsEqualTo(5.00m);
     }
 
+    /// <summary>
+    /// Tests ForMember with converter applies the conversion.
+    /// </summary>
     [Test]
     public async Task ForMember_WithConverter_AppliesConversion()
     {
         var builder = new MappingConfigurationBuilder();
         builder.CreateMap<Product, ProductDto>()
-               .ForMember<string, decimal>(dst => dst.Label, src => $"${src.Price:F2}");
+               .ForMember<string, string>(dst => dst.Label, src => $"${src.Price:F2}");
         var mapper = new ObjectMapper(builder.Build());
 
         var dto = mapper.Map<ProductDto>(new Product { Price = 12.5m });
@@ -72,14 +94,17 @@ public class ProfileMappingTests
         await Assert.That(dto.Label).IsEqualTo("$12.50");
     }
 
+    /// <summary>
+    /// Tests ReverseMap creates symmetric mapping.
+    /// </summary>
     [Test]
     public async Task ReverseMap_CreatesSymmetricMapping()
     {
         var builder = new MappingConfigurationBuilder();
         builder.CreateMap<Product, ProductDto>()
-               .ForMember(dst => dst.Label, src => src.Code)
+             .ForMember<string>(dst => dst.Label, src => src.Code)
                .ReverseMap()
-               .ForMember(dst => dst.Code, src => src.Label);
+             .ForMember<string>(dst => dst.Code, src => src.Label);
         var mapper = new ObjectMapper(builder.Build());
 
         var dto = mapper.Map<ProductDto>(new Product { Id = 7, Code = "ABC" });
