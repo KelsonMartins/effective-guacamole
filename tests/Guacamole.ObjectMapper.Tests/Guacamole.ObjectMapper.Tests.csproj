@@ -5,11 +5,11 @@
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
     <NoWarn>1591</NoWarn>
-    <TestingPlatformDotnetTestSupport>true</TestingPlatformDotnetTestSupport>
+    <!-- <TestingPlatformDotnetTestSupport>true</TestingPlatformDotnetTestSupport> -->
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.Testing.Platform.MSBuild" Version="2.2.3" />
+    <!-- <PackageReference Include="Microsoft.Testing.Platform.MSBuild" Version="2.2.3" /> -->
     <PackageReference Include="TUnit" Version="1.45.29" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.8" />
   </ItemGroup>
