@@ -34,7 +34,7 @@ jobs:
         run: dotnet build --configuration Release --no-restore
 
       - name: Test
-        run: dotnet test --configuration Release --no-build --verbosity normal --results-directory ./TestResults -- --coverage --report-trx --fail-fast --output Detailed
+        run: dotnet test --configuration Release --no-build --verbosity normal --results-directory ./TestResults --coverage --report-trx --fail-fast --output Detailed
 
       - name: Upload test results
         if: always()
