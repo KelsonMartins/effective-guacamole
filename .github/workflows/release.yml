@@ -10,7 +10,7 @@ on:
     types: [opened, synchronize, closed]
 
 permissions:
-  contents: read
+  contents: write
   pull-requests: write
   id-token: write
 
@@ -30,6 +30,28 @@ jobs:
 
       - name: Restore dependencies
         run: dotnet restore
+
+      - name: Bump minor/major version
+        if: github.event_name == 'push'
+        run: |
+          CURRENT=$(grep -oP '(?<=<VersionPrefix>)[^<]+' Directory.Build.props)
+          MAJOR=$(echo "$CURRENT" | cut -d. -f1)
+          MINOR=$(echo "$CURRENT" | cut -d. -f2)
+          if [ "$MINOR" -eq 9 ]; then
+            NEW_MAJOR=$((MAJOR + 1))
+            NEW_MINOR=0
+          else
+            NEW_MAJOR=$MAJOR
+            NEW_MINOR=$((MINOR + 1))
+          fi
+          NEW_VERSION="${NEW_MAJOR}.${NEW_MINOR}.0"
+          sed -i "s|<VersionPrefix>${CURRENT}</VersionPrefix>|<VersionPrefix>${NEW_VERSION}</VersionPrefix>|" Directory.Build.props
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Directory.Build.props
+          git commit -m "chore: bump version to v${NEW_VERSION} [skip ci]"
+          git push
+          echo "NEW_VERSION=${NEW_VERSION}" >> "$GITHUB_ENV"
 
       - name: Build
         run: dotnet build --configuration Release --no-restore
@@ -73,6 +95,16 @@ jobs:
         id: login
         with:
           user: KelsonMartins
+
+      - name: Create GitHub Release
+        if: github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "v${NEW_VERSION}" ./artifacts/*.nupkg \
+            --title "v${NEW_VERSION}" \
+            --generate-notes \
+            --latest
 
       - name: Push to NuGet.org
         run: |

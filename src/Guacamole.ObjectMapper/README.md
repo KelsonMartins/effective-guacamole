@@ -1,223 +1,139 @@
-# Object Mapper Usage Examples
+## Guacamole.ObjectMapper
 
-This document demonstrates how to use the high-performance object mapper in the Secure-Sense application.
+A lightweight object-to-object mapper for .NET with fluent profile configuration, convention-based fallback, and attribute hints.
 
-## Setup
+### Install
 
-The object mapper is automatically registered with dependency injection when you call `AddCommonServices()`:
-
-```csharp
-services.AddCommonServices(configuration);
+```bash
+dotnet add package Guacamole.ObjectMapper
 ```
 
-This registers the `IObjectMapper` interface with the container and scans for mapping profiles in the specified assemblies.
-
-## Basic Usage
-
-### Simple Mapping
+### Register
 
 ```csharp
-public class UserController : ControllerBase
+// Scan an assembly for IMappingProfile implementations
+builder.Services.AddObjectMapper(typeof(UserProfile).Assembly);
+
+// Pass profiles directly
+builder.Services.AddObjectMapper(new UserProfile(), new OrderProfile());
+
+// Inline configuration
+builder.Services.AddObjectMapper(cfg =>
 {
-    private readonly IObjectMapper _mapper;
+    cfg.CreateMap<User, UserDto>();
+});
 
-    public UserController(IObjectMapper mapper)
-    {
-        _mapper = mapper;
-    }
-
-    public async Task<ActionResult<UserDto>> GetUser(int id)
-    {
-        var user = await _userRepository.GetByIdAsync(id);
-        var userDto = _mapper.Map<UserDto>(user);
-        return Ok(userDto);
-    }
-}
+// No profiles — convention mapping only
+builder.Services.AddObjectMapper();
 ```
 
-### Collection Mapping
+### Define a profile
 
 ```csharp
-public async Task<ActionResult<IEnumerable<ProductDto>>> GetProducts()
-{
-    var products = await _productRepository.GetAllAsync();
-    var productDtos = _mapper.Map<Product, ProductDto>(products);
-    return Ok(productDtos);
-}
-```
-
-### PagedList Mapping
-
-```csharp
-public async Task<ActionResult<PagedList<UserDto>>> GetUsers(int pageNumber = 1, int pageSize = 10)
-{
-    var users = await _userRepository.GetPagedAsync(pageNumber, pageSize);
-    var userDtos = _mapper.Map<PagedList<UserDto>>(users);
-    return Ok(userDtos);
-}
-```
-
-### Reverse Mapping
-
-```csharp
-[HttpPost]
-public async Task<ActionResult<UserDto>> CreateUser([FromBody] CreateUserDto createUserDto)
-{
-    var user = _mapper.ReverseMap<User, CreateUserDto>(createUserDto);
-    await _userRepository.AddAsync(user);
-
-    var userDto = _mapper.Map<UserDto>(user);
-    return CreatedAtAction(nameof(GetUser), new { id = user.Id }, userDto);
-}
-```
-
-### Mapping to Existing Object
-
-```csharp
-[HttpPut("{id}")]
-public async Task<ActionResult> UpdateUser(int id, [FromBody] UpdateUserDto updateUserDto)
-{
-    var user = await _userRepository.GetByIdAsync(id);
-    if (user == null) return NotFound();
-
-    _mapper.Map(updateUserDto, user);
-    await _userRepository.UpdateAsync(user);
-
-    return NoContent();
-}
-```
-
-## Creating Custom Mapping Profiles
-
-### Basic Profile
-
-```csharp
-public class UserMappingProfile : MappingProfile
+public class UserProfile : MappingProfile
 {
     public override void Configure(IMappingConfigurationBuilder builder)
     {
         builder.CreateMap<User, UserDto>()
-            .ForMember(dest => dest.FullName, src => $"{src.FirstName} {src.LastName}")
-            .ForMember(dest => dest.Email, src => src.EmailAddress);
-
-        builder.CreateMap<UserDto, User>()
-            .ForMember(dest => dest.EmailAddress, src => src.Email)
-            .Ignore(dest => dest.CreatedAt)
-            .Ignore(dest => dest.UpdatedAt);
+               .ForMember(dst => dst.FullName, src => src.Name)
+               .ForMember<string, int>(dst => dst.AgeLabel, src => $"{src.Age} years old")
+               .Ignore(dst => dst.InternalNotes)
+               .ReverseMap();
     }
 }
 ```
 
-### Advanced Profile with Custom Conversions
+### Map
 
 ```csharp
-public class OrderMappingProfile : MappingProfile
+// Inject IObjectMapper
+var dto  = mapper.Map<UserDto>(user);                 // infer source type
+var dto2 = mapper.Map<User, UserDto>(user);           // explicit source type
+var list = mapper.Map<User, UserDto>(users);          // IEnumerable<T>
+var user = mapper.ReverseMap<User, UserDto>(dto);     // reverse direction
+
+// Map onto an existing instance
+mapper.Map(command, existingEntity);
+```
+
+### Convention-based mapping
+
+When no profile is registered for a pair, properties are matched by name (case-insensitive). Supported conversions:
+
+- Same type or assignable
+- Enum ↔ Enum (by underlying `int` value)
+- Primitives, `string`, `decimal`, `DateTime`, `DateTimeOffset`, `Guid`
+- Nested complex objects (recursive)
+- Collections (`IEnumerable<T>`, `List<T>`, arrays)
+- Circular references (detected and broken automatically)
+
+### Attributes
+
+```csharp
+[MapTo(typeof(UserDto), ReverseMap = true)]
+public class User
+{
+    [MapFrom("UserName")]
+    public string Name { get; set; }
+
+    [IgnoreMap]
+    public string Password { get; set; }
+}
+```
+
+| Attribute | Target | Effect |
+|---|---|---|
+| `[MapTo(typeof(T))]` | Class | Registers a convention map to `T`; `ReverseMap = true` adds the inverse |
+| `[MapFrom("Prop")]` | Property | Reads from the named source property instead of matching by name |
+| `[IgnoreMap]` | Property | Excludes the property from convention mapping |
+
+### Advanced profile with custom conversions
+
+Use the converter overload of `ForMember` when the source and destination property types differ or when the value requires computation:
+
+```csharp
+public class OrderProfile : MappingProfile
 {
     public override void Configure(IMappingConfigurationBuilder builder)
     {
         builder.CreateMap<Order, OrderDto>()
-            .ForMember(dest => dest.CustomerName,
-                      order => $"{order.Customer.FirstName} {order.Customer.LastName}")
-            .ForMember(dest => dest.TotalAmount,
-                      order => order.Items.Sum(i => i.Price * i.Quantity))
-            .ForMember(dest => dest.Status,
-                      order => order.StatusId switch
-                      {
-                          1 => "Pending",
-                          2 => "Processing",
-                          3 => "Shipped",
-                          4 => "Delivered",
-                          _ => "Unknown"
-                      });
+               .ForMember<string, string>(
+                   dst => dst.CustomerName,
+                   src => $"{src.Customer.FirstName} {src.Customer.LastName}")
+               .ForMember<decimal, decimal>(
+                   dst => dst.TotalAmount,
+                   src => src.Items.Sum(i => i.Price * i.Quantity))
+               .ForMember<string, int>(
+                   dst => dst.Status,
+                   src => src.StatusId switch
+                   {
+                       1 => "Pending",
+                       2 => "Processing",
+                       3 => "Shipped",
+                       4 => "Delivered",
+                       _ => "Unknown"
+                   });
     }
 }
 ```
 
-## Performance Features
+### Performance
 
-### Compiled Expression Caching
-The mapper uses compiled expressions and caching for maximum performance:
+- **Compiled expression caching** — the first mapping for a type pair compiles and caches a `Func<object, object>` in a `ConcurrentDictionary`; subsequent calls use the cached delegate directly.
+- **Circular-reference detection** — a per-call `HashSet<object>` (reference equality) tracks visited instances; a cycle returns a default instance instead of recursing infinitely.
+- **Scoped registration** — `IObjectMapper` is registered as `Scoped`, so the singleton `MappingConfiguration` is shared and the mapper itself is lightweight per request.
 
-- First mapping compiles the expression
-- Subsequent mappings use the cached compiled version
-- Thread-safe concurrent dictionary for cache storage
+### Best practices
 
-### Optimized Collection Handling
-- Special handling for IEnumerable, List, Array types
-- Efficient PagedList mapping with property preservation
-- Minimal memory allocations during collection mapping
+- **Inject `IObjectMapper`** — never instantiate `ObjectMapper` directly; resolve it through DI.
+- **Group mappings by feature** — one `MappingProfile` per domain area keeps configurations focused and easy to test.
+- **Prefer `.ReverseMap()`** for symmetric pairs — it registers the inverse automatically so both directions stay in sync.
+- **Use `.Ignore()`** for destination properties that must not be overwritten (e.g. audit timestamps, computed columns).
+- **Use the converter overload for cross-type members** — `ForMember<TDest, TSrc>(dst => ..., src => ...)` handles type coercion and computed values without requiring a separate profile step.
 
-### Smart Type Detection
-- Automatic detection of compatible types
-- Value type conversion support
-- Recursive mapping for complex nested objects
+### Error handling
 
-## Best Practices
-
-### 1. Use Dependency Injection
-Always inject `IObjectMapper` rather than creating instances manually.
-
-### 2. Create Specific Profiles
-Group related mappings into focused profiles:
-
-```csharp
-public class ProductMappingProfile : MappingProfile { ... }
-public class OrderMappingProfile : MappingProfile { ... }
-public class UserMappingProfile : MappingProfile { ... }
-```
-
-### 3. Configure Reverse Mappings Explicitly
-When you need bidirectional mapping, configure both directions:
-
-```csharp
-builder.CreateMap<Entity, Dto>()
-    .ForMember(dest => dest.DisplayName, src => src.Name);
-
-builder.CreateMap<Dto, Entity>()
-    .ForMember(dest => dest.Name, src => src.DisplayName)
-    .Ignore(dest => dest.CreatedAt);
-```
-
-### 4. Use Ignore for Read-Only Properties
-Explicitly ignore properties that should not be mapped:
-
-```csharp
-builder.CreateMap<UserDto, User>()
-    .Ignore(dest => dest.Id)
-    .Ignore(dest => dest.CreatedAt)
-    .Ignore(dest => dest.LastModified);
-```
-
-### 5. Leverage Custom Converters for Complex Logic
-For complex transformations, use custom converter functions:
-
-```csharp
-builder.CreateMap<User, UserDto>()
-    .ForMember(dest => dest.Age, user => CalculateAge(user.BirthDate))
-    .ForMember(dest => dest.Status, user => GetUserStatus(user));
-```
-
-## Error Handling
-
-The mapper includes comprehensive error handling and logging:
-
-- Failed mappings are logged with context
-- Type conversion errors are handled gracefully
-- Missing properties are ignored with optional warnings
-
-## Integration with Domain Models
-
-The mapper works seamlessly with your existing domain architecture:
-
-```csharp
-// Entity Framework entities
-public class UserEntity : TEntity { ... }
-
-// Domain models
-public class User : TModel { ... }
-
-// DTOs
-public class UserDto { ... }
-
-// All can be mapped between each other with proper profile configuration
-```
+- **Null source** — all `Map` and `ReverseMap` overloads return a default-constructed destination instance when the source is `null`; no exception is thrown.
+- **Null source on `Map(source, destination)`** — the void overload is a no-op when either argument is `null`.
+- **Missing properties** — unmatched destination properties are silently skipped during convention mapping.
+- **Cycles** — circular object graphs are broken by returning an empty destination instance at the point of re-entry.

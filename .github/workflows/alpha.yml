@@ -10,7 +10,7 @@ on:
     types: [opened, synchronize, closed]
 
 permissions:
-  contents: read
+  contents: write
   pull-requests: write
   id-token: write
 
@@ -30,6 +30,22 @@ jobs:
 
       - name: Restore dependencies
         run: dotnet restore
+
+      - name: Bump patch version
+        if: github.event_name == 'push'
+        run: |
+          CURRENT=$(grep -oP '(?<=<VersionPrefix>)[^<]+' Directory.Build.props)
+          MAJOR=$(echo "$CURRENT" | cut -d. -f1)
+          MINOR=$(echo "$CURRENT" | cut -d. -f2)
+          PATCH=$(echo "$CURRENT" | cut -d. -f3)
+          NEW_VERSION="${MAJOR}.${MINOR}.$((PATCH + 1))"
+          sed -i "s|<VersionPrefix>${CURRENT}</VersionPrefix>|<VersionPrefix>${NEW_VERSION}</VersionPrefix>|" Directory.Build.props
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Directory.Build.props
+          git commit -m "chore: bump version to v${NEW_VERSION} [skip ci]"
+          git push
+          echo "NEW_VERSION=${NEW_VERSION}" >> "$GITHUB_ENV"
 
       - name: Build
         run: dotnet build --configuration Release --no-restore /p:VersionSuffix=alpha.${{ github.run_number }}
@@ -73,6 +89,17 @@ jobs:
         id: login
         with:
           user: KelsonMartins
+
+      - name: Create GitHub Pre-release
+        if: github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_NUMBER: ${{ github.run_number }}
+        run: |
+          gh release create "v${NEW_VERSION}-alpha.${RUN_NUMBER}" ./artifacts/*.nupkg \
+            --title "v${NEW_VERSION}-alpha.${RUN_NUMBER}" \
+            --generate-notes \
+            --prerelease
 
       - name: Push to NuGet.org
         run: |
