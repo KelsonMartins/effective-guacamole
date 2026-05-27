@@ -4,6 +4,10 @@ on:
   push:
     branches:
       - main
+  pull_request:
+    branches:
+      - main
+    types: [opened, synchronize, closed]
 
 permissions:
   contents: read
@@ -30,7 +34,35 @@ jobs:
         run: dotnet build --configuration Release --no-restore
 
       - name: Test
-        run: dotnet test --configuration Release --no-build --verbosity normal
+        run: dotnet test --configuration Release --no-build --verbosity normal --results-directory ./TestResults -- --coverage --report-trx --fail-fast --output Detailed
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-results-release.${{ github.run_number }}
+          path: ./TestResults/*.trx
+
+      - name: Upload coverage
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage-release.${{ github.run_number }}
+          path: ./TestResults/*.coverage
+
+      - name: Download all test results
+        if: github.event_name == 'pull_request'
+        uses: actions/download-artifact@v8
+        with:
+          pattern: test-results-*
+          path: ./TestResults
+
+      - name: Publish test results
+        if: github.event_name == 'pull_request'
+        uses: EnricoMi/publish-unit-test-result-action@v2
+        with:
+          files: ./TestResults/**/*.trx
+          comment_mode: always
 
       - name: Pack
         run: dotnet pack --configuration Release --no-build --output ./artifacts
