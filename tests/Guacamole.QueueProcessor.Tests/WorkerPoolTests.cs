@@ -1,4 +1,6 @@
 using System.Threading.Channels;
+using System.Text;
+using System.Text.Json;
 using Guacamole.QueueProcessor.Abstract;
 using Guacamole.QueueProcessor.Runtime;
 using Guacamole.QueueProcessor.Configuration;
@@ -129,6 +131,33 @@ public class WorkerPoolTests
         await pool.WaitForCompletionAsync();
 
         await Assert.That(poison.RoutedMessages.Select(r => r.MessageId)).Contains("bad-msg");
+    }
+
+    [Test]
+    public async Task ProcessMessage_Base64EncodedJson_ProcessesSuccessfully()
+    {
+        var poison = new FakePoisonRouter();
+        var deleter = new FakeMessageDeleter();
+        var processor = new FakeQueueProcessor<OrderMessage>();
+
+        var pool = BuildPool(processor, deleter, poison);
+        var channel = Channel.CreateUnbounded<MessageEnvelope>();
+
+        var json = JsonSerializer.Serialize(new OrderMessage("O-BASE64", 9.5m));
+        var base64Payload = Convert.ToBase64String(Encoding.UTF8.GetBytes(json));
+        var envelope = EnvelopeFactory.CreateWithRawPayload("base64-msg", Encoding.UTF8.GetBytes(base64Payload));
+
+        await channel.Writer.WriteAsync(envelope);
+        channel.Writer.Complete();
+
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        pool.Start(channel.Reader, 1, cts.Token);
+        await pool.WaitForCompletionAsync();
+
+        await Assert.That(processor.ReceivedMessages).Count().IsEqualTo(1);
+        await Assert.That(processor.ReceivedMessages[0].Message.OrderId).IsEqualTo("O-BASE64");
+        await Assert.That(deleter.DeletedMessageIds).Contains("base64-msg");
+        await Assert.That(poison.RoutedMessages).IsEmpty();
     }
 
     [Test]

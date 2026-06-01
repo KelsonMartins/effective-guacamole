@@ -17,6 +17,7 @@ public class BatchProcessingTests
     private static WorkerPool BuildBatchPool(
         FakeQueueBatchProcessor<InvoiceMessage> processor,
         FakeMessageDeleter? deleter = null,
+        FakePoisonRouter? poisonRouter = null,
         int batchSize = 5,
         int batchFlushTimeoutMs = 50)
     {
@@ -25,6 +26,7 @@ public class BatchProcessingTests
 
         var sp = services.BuildServiceProvider();
         deleter ??= new FakeMessageDeleter();
+        poisonRouter ??= new FakePoisonRouter();
 
         return new WorkerPool(
             queueName: "invoices",
@@ -34,7 +36,7 @@ public class BatchProcessingTests
             serviceProvider: sp,
             deserializer: new MessageDeserializer(),
             messageDeleter: deleter,
-            poisonRouter: new FakePoisonRouter(),
+            poisonRouter: poisonRouter,
             retryQueue: null,
             logger: NullLogger<WorkerPool>.Instance,
             maxDequeueCount: 5,
@@ -113,6 +115,34 @@ public class BatchProcessingTests
         await Assert.That(processor.ReceivedBatches).Count().IsGreaterThan(0);
         var totalMessages = processor.ReceivedBatches.Sum(b => b.Count);
         await Assert.That(totalMessages).IsEqualTo(2);
+    }
+
+    [Test]
+    public async Task BatchProcessor_InvalidJson_RoutesBadMessageAndProcessesGoodOnes()
+    {
+        var processor = new FakeQueueBatchProcessor<InvoiceMessage>();
+        var deleter = new FakeMessageDeleter();
+        var poison = new FakePoisonRouter();
+        var pool = BuildBatchPool(processor, deleter, poison, batchSize: 5, batchFlushTimeoutMs: 50);
+
+        var channel = Channel.CreateUnbounded<MessageEnvelope>();
+        var good1 = EnvelopeFactory.Create(new InvoiceMessage("I1", 10m), messageId: "good-1");
+        var bad = EnvelopeFactory.CreateWithRawPayload("bad-1", "not-json"u8.ToArray());
+        var good2 = EnvelopeFactory.Create(new InvoiceMessage("I2", 20m), messageId: "good-2");
+
+        await channel.Writer.WriteAsync(good1);
+        await channel.Writer.WriteAsync(bad);
+        await channel.Writer.WriteAsync(good2);
+        channel.Writer.Complete();
+
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        pool.Start(channel.Reader, 1, cts.Token);
+        await pool.WaitForCompletionAsync();
+
+        var totalProcessed = processor.ReceivedBatches.Sum(b => b.Count);
+        await Assert.That(totalProcessed).IsEqualTo(2);
+        await Assert.That(poison.RoutedMessages.Select(x => x.MessageId)).Contains("bad-1");
+        await Assert.That(deleter.DeletedMessageIds).Contains("bad-1");
     }
 }
 

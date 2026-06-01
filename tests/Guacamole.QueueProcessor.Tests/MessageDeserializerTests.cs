@@ -65,6 +65,20 @@ public class MessageDeserializerTests
         await Assert.That(result.Value).IsEqualTo(99);
     }
 
+    [Test]
+    public async Task Deserialize_Base64EncodedJson_MapsCorrectly()
+    {
+        var json = """{"name":"base64","value":123}""";
+        var encoded = Convert.ToBase64String(Encoding.UTF8.GetBytes(json));
+        var payload = new ReadOnlyMemory<byte>(Encoding.UTF8.GetBytes(encoded));
+
+        var result = MessageDeserializer.Deserialize<SampleMessage>(payload);
+
+        await Assert.That(result).IsNotNull();
+        await Assert.That(result!.Name).IsEqualTo("base64");
+        await Assert.That(result.Value).IsEqualTo(123);
+    }
+
     private static ReadOnlyMemory<byte> Serialize<T>(T value)
         => new(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(value)));
 }

@@ -322,7 +322,19 @@ internal sealed class WorkerPool(string queueName,
 
         foreach (var envelope in valid)
         {
-            var message = _deserializer.Deserialize(envelope.Payload, _messageType);
+            object? message;
+            try
+            {
+                message = _deserializer.Deserialize(envelope.Payload, _messageType);
+            }
+            catch (Exception ex) when (ex is System.Text.Json.JsonException or FormatException or InvalidOperationException)
+            {
+                _logger.LogWarning(ex, "Failed to deserialize message {MessageId} for queue {QueueName}", envelope.MessageId, _queueName);
+                await _poisonRouter.RouteToDeadLetterAsync(envelope, "Deserialization failed", cancellationToken);
+                await _messageDeleter.DeleteMessageAsync(envelope, cancellationToken);
+                continue;
+            }
+
             if (message == null)
             {
                 await _poisonRouter.RouteToDeadLetterAsync(envelope, "Deserialization failed", cancellationToken);
