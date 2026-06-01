@@ -2,7 +2,6 @@ using Guacamole.QueueProcessor.Models;
 
 namespace Guacamole.QueueProcessor.Abstract
 {
-
     /// <summary>
     /// Interface for deleting messages from the queue.
     /// </summary>

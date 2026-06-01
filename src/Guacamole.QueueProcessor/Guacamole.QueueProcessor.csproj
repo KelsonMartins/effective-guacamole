@@ -4,12 +4,40 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+    <PackageId>Guacamole.QueueProcessor</PackageId>
+    <IsPackable>true</IsPackable>
+    <Description>Adaptive queue processing runtime with Azure Storage Queue, Service Bus, and
+      RabbitMQ providers.</Description>
+    <PackageTags>queue;processor;queue-processor;azure;service-bus;rabbitmq</PackageTags>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.8" />
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+      <_Parameter1>Guacamole.QueueProcessor.Tests</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Core Extensions -->
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions"
+      Version="10.0.8" />
+    <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions"
+      Version="10.0.8" />
+    <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.8" />
+    <!-- Resilience -->
+    <PackageReference Include="Microsoft.Extensions.Resilience" Version="10.6.0" />
+    <!-- Azure Storage Queue -->
     <PackageReference Include="Azure.Storage.Queues" Version="12.26.0" />
     <PackageReference Include="Microsoft.Extensions.Azure" Version="1.14.0" />
+    <!-- Azure Service Bus -->
+    <PackageReference Include="Azure.Messaging.ServiceBus" Version="7.20.1" />
+    <!-- RabbitMQ -->
+    <PackageReference Include="RabbitMQ.Client" Version="7.2.1" />
   </ItemGroup>
 
 </Project>

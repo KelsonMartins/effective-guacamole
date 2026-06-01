@@ -7,6 +7,7 @@
   <Folder Name="/tests/">
     <Project Path="tests/Guacamole.Mediator.Tests/Guacamole.Mediator.Tests.csproj" />
     <Project Path="tests/Guacamole.ObjectMapper.Tests/Guacamole.ObjectMapper.Tests.csproj" />
+    <Project Path="tests/Guacamole.QueueProcessor.Benchmarks/Guacamole.QueueProcessor.Benchmarks.csproj" />
     <Project Path="tests/Guacamole.QueueProcessor.Tests/Guacamole.QueueProcessor.Tests.csproj" />
   </Folder>
 </Solution>

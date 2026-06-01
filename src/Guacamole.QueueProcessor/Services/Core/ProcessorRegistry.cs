@@ -11,7 +11,7 @@ public sealed class ProcessorRegistry
     /// <summary>
     /// Registers a processor for a queue.
     /// </summary>
-    public void Register(string queueName, Type messageType, Type processorType)
+    public void Register(string queueName, Type messageType, Type processorType, bool isBatchProcessor = false)
     {
         if (_registrations.ContainsKey(queueName))
             throw new InvalidOperationException($"Queue '{queueName}' already has a registered processor.");
@@ -20,7 +20,8 @@ public sealed class ProcessorRegistry
         {
             QueueName = queueName,
             MessageType = messageType,
-            ProcessorType = processorType
+            ProcessorType = processorType,
+            IsBatchProcessor = isBatchProcessor
         };
     }
 
@@ -39,4 +40,9 @@ public sealed class ProcessorRegistry
     public bool HasRegistration(string queueName)
         => _registrations.ContainsKey(queueName);
 
+    /// <summary>
+    /// Returns all registered queue names.
+    /// </summary>
+    public IReadOnlyCollection<string> GetQueueNames()
+        => _registrations.Keys.ToList().AsReadOnly();
 }

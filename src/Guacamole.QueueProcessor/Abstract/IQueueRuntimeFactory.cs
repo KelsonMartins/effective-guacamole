@@ -1,10 +1,14 @@
-namespace Guacamole.QueueProcessor.Abstract
+namespace Guacamole.QueueProcessor.Abstract;
+
+/// <summary>
+/// Factory for creating provider-specific queue components.
+/// Each call may create fresh components (used when hot-reloading configuration).
+/// </summary>
+public interface IQueueRuntimeFactory
 {
     /// <summary>
-    /// Factory for creating provider-specific queue components.
+    /// Creates all provider-specific components needed to operate a single queue.
     /// </summary>
-    public interface IQueueRuntimeFactory
-    {
-        (IMessageReceiver receiver, IMessageDeleter deleter, IPoisonRouter poisonRouter) CreateComponents(string queueName);
-    }
+    /// <param name="queueName">The logical queue name as configured</param>
+    QueueComponents CreateComponents(string queueName);
 }

@@ -1,9 +1,10 @@
 using System.Threading.Channels;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using Guacamole.QueueProcessor.Abstract;
 using Guacamole.QueueProcessor.Configuration;
 using Guacamole.QueueProcessor.Models;
-using Guacamole.QueueProcessor.Abstract;
 using Guacamole.QueueProcessor.Services.Core;
 
 namespace Guacamole.QueueProcessor.Runtime;
@@ -11,10 +12,13 @@ namespace Guacamole.QueueProcessor.Runtime;
 /// <summary>
 /// Runtime orchestrator for a single queue.
 /// Manages receiver, workers, channel, scaler, and visibility renewal.
+/// Reads its options from <see cref="IOptionsMonitor{QueueProcessingOptions}"/> so that
+/// hot-reloaded configuration is always used on the next start cycle.
 /// </summary>
-public sealed class QueueRuntime(QueueRuntimeOptions options, IServiceProvider serviceProvider, ProcessorRegistry processorRegistry, ILogger<QueueRuntime> logger)
+public sealed class QueueRuntime(string queueName, IOptionsMonitor<QueueProcessingOptions> optionsMonitor, IServiceProvider serviceProvider, ProcessorRegistry processorRegistry, ILogger<QueueRuntime> logger)
 {
-    private readonly QueueRuntimeOptions _options = options;
+    private readonly string _queueName = queueName;
+    private readonly IOptionsMonitor<QueueProcessingOptions> _optionsMonitor = optionsMonitor;
     private readonly IServiceProvider _serviceProvider = serviceProvider;
     private readonly ProcessorRegistry _processorRegistry = processorRegistry;
     private readonly ILogger<QueueRuntime> _logger = logger;
@@ -24,49 +28,79 @@ public sealed class QueueRuntime(QueueRuntimeOptions options, IServiceProvider s
     private WorkerPool? _workerPool;
     private AutoScaler? _autoScaler;
 
-    public string QueueName => _options.Name;
+    public string QueueName => _queueName;
+
+    /// <summary>
+    /// Resolves the current options snapshot for this queue.
+    /// Called fresh on each <see cref="StartAsync"/> to pick up hot-reloaded values.
+    /// </summary>
+    public QueueRuntimeOptions GetCurrentOptions()
+    {
+        var all = _optionsMonitor.CurrentValue;
+        return all.Queues.First(q => q.Name.Equals(_queueName, StringComparison.OrdinalIgnoreCase));
+    }
 
     /// <summary>
     /// Initializes and starts the queue runtime.
     /// </summary>
-    public async Task StartAsync(IMessageReceiver messageReceiver, IMessageDeleter messageDeleter, IPoisonRouter poisonRouter, CancellationToken cancellationToken)
+    public async Task StartAsync(QueueComponents components, CancellationToken cancellationToken)
     {
-        _logger.LogInformation("Starting queue runtime for {QueueName}", _options.Name);
+        // Always read fresh options so hot reload takes effect
+        var options = GetCurrentOptions();
 
-        // Get processor registration
-        var registration = _processorRegistry.GetRegistration(_options.Name)
-            ?? throw new InvalidOperationException($"No processor registered for queue '{_options.Name}'");
+        _logger.LogInformation("Starting queue runtime for {QueueName}", _queueName);
 
-        // Create bounded channel
-        _channel = Channel.CreateBounded<MessageEnvelope>(new BoundedChannelOptions(_options.ChannelCapacity)
+        var registration = _processorRegistry.GetRegistration(_queueName)
+            ?? throw new InvalidOperationException($"No processor registered for queue '{_queueName}'");
+
+        // Reset state for potential restart
+        _channel = Channel.CreateBounded<MessageEnvelope>(new BoundedChannelOptions(options.ChannelCapacity)
         {
             FullMode = BoundedChannelFullMode.Wait,
             SingleReader = false,
             SingleWriter = true
         });
 
-        // Create components
         var deserializer = new MessageDeserializer();
 
-        _workerPool = new WorkerPool(_options.Name, registration.MessageType, registration.ProcessorType,
-                                     _serviceProvider, deserializer, messageDeleter, poisonRouter,
-                                     _serviceProvider.GetRequiredService<ILogger<WorkerPool>>(),
-                                     _options.MaxDequeueCount);
+        _workerPool = new WorkerPool(
+            queueName: _queueName,
+            messageType: registration.MessageType,
+            processorType: registration.ProcessorType,
+            isBatchProcessor: registration.IsBatchProcessor,
+            serviceProvider: _serviceProvider,
+            deserializer: deserializer,
+            messageDeleter: components.Deleter,
+            poisonRouter: components.PoisonRouter,
+            retryQueue: components.RetryQueue,
+            logger: _serviceProvider.GetRequiredService<ILogger<WorkerPool>>(),
+            maxDequeueCount: options.MaxDequeueCount,
+            batchSize: options.BatchSize,
+            batchFlushTimeoutMs: options.BatchFlushTimeoutMs,
+            retryOptions: options.Retry);
 
-        _receiver = new AdaptiveReceiver(_options.Name, messageReceiver, _serviceProvider.GetRequiredService<ILogger<AdaptiveReceiver>>(), _options.BatchSize);
+        _receiver = new AdaptiveReceiver(
+            _queueName,
+            components.Receiver,
+            _serviceProvider.GetRequiredService<ILogger<AdaptiveReceiver>>(),
+            options.BatchSize);
 
-        // Start worker pool
-        _workerPool.Start(_channel.Reader, _options.MinWorkers, cancellationToken);
+        _workerPool.Start(_channel.Reader, options.MinWorkers, cancellationToken);
 
-        // Start auto-scaler
-        if (_options.EnableAdaptiveScaling)
+        if (options.EnableAdaptiveScaling)
         {
-            _autoScaler = new AutoScaler(_options.Name, messageReceiver, _workerPool, _serviceProvider.GetRequiredService<ILogger<AutoScaler>>(), _options, _options.MinWorkers);
+            _autoScaler = new AutoScaler(
+                _queueName,
+                components.Receiver,
+                _workerPool,
+                _serviceProvider.GetRequiredService<ILogger<AutoScaler>>(),
+                options,
+                options.MinWorkers);
 
             _ = Task.Run(() => _autoScaler.RunAsync(cancellationToken), cancellationToken);
         }
 
-        // Start receiver (runs until cancellation)
+        // Blocks until cancellation
         await _receiver.RunAsync(_channel.Writer, cancellationToken);
     }
 
@@ -75,13 +109,11 @@ public sealed class QueueRuntime(QueueRuntimeOptions options, IServiceProvider s
     /// </summary>
     public async Task StopAsync()
     {
-        _logger.LogInformation("Stopping queue runtime for {QueueName}", _options.Name);
+        _logger.LogInformation("Stopping queue runtime for {QueueName}", _queueName);
 
-        // Channel writer is already completed by receiver
-        // Wait for workers to drain the channel
         if (_workerPool != null)
             await _workerPool.WaitForCompletionAsync();
 
-        _logger.LogInformation("Queue runtime stopped for {QueueName}", _options.Name);
+        _logger.LogInformation("Queue runtime stopped for {QueueName}", _queueName);
     }
 }

@@ -1,6 +1,1 @@
-﻿namespace Guacamole.QueueProcessor.Tests;
-
-public class Class1
-{
-
-}
+﻿// This file intentionally left blank. Tests are in separate files.

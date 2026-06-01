@@ -2,6 +2,7 @@ using Azure.Storage.Queues;
 using Guacamole.QueueProcessor.Abstract;
 using Guacamole.QueueProcessor.Configuration;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace Guacamole.QueueProcessor.Services.Azure;
 
@@ -11,49 +12,73 @@ namespace Guacamole.QueueProcessor.Services.Azure;
 /// </summary>
 internal sealed class AzureQueueRuntimeFactory : IQueueRuntimeFactory
 {
-    private readonly QueueProcessingOptions _options;
+    private readonly IOptionsMonitor<QueueProcessingOptions> _optionsMonitor;
     private readonly ILoggerFactory _loggerFactory;
-    private readonly Dictionary<string, (QueueClient main, QueueClient deadLetter)> _queueClients = [];
+    private readonly QueueServiceClient _client;
+    private readonly Dictionary<string, (QueueClient main, QueueClient deadLetter, QueueClient? retry)> _queueClients = [];
 
-    public AzureQueueRuntimeFactory(QueueProcessingOptions options, ILoggerFactory loggerFactory)
+    public AzureQueueRuntimeFactory(IOptionsMonitor<QueueProcessingOptions> optionsMonitor, ILoggerFactory loggerFactory, QueueServiceClient client)
     {
-        _options = options;
+        _optionsMonitor = optionsMonitor;
         _loggerFactory = loggerFactory;
+        _client = client;
 
-        InitializeQueueClients();
+        // Initialize with current snapshot; re-initialize on each CreateComponents call to pick up changes
+        InitializeQueueClients(_optionsMonitor.CurrentValue);
     }
 
-    public (IMessageReceiver receiver, IMessageDeleter deleter, IPoisonRouter poisonRouter) CreateComponents(string queueName)
+    public QueueComponents CreateComponents(string queueName)
     {
+        // Re-read options so hot-reloaded connection strings / queue names are respected
+        var options = _optionsMonitor.CurrentValue;
+        InitializeQueueClients(options);
+
         if (!_queueClients.TryGetValue(queueName, out var clients))
             throw new InvalidOperationException($"Queue '{queueName}' not found in configuration");
 
-        var queueOptions = _options.Queues.First(q => q.Name.Equals(queueName, StringComparison.OrdinalIgnoreCase));
+        var queueOptions = options.Queues.First(q => q.Name.Equals(queueName, StringComparison.OrdinalIgnoreCase));
 
         var receiver = new AzureMessageReceiver(clients.main, queueOptions.VisibilityTimeoutSeconds);
         var deleter = new AzureMessageDeleter(clients.main);
         var poisonRouter = new AzurePoisonRouter(clients.deadLetter, _loggerFactory.CreateLogger<AzurePoisonRouter>());
+        var visibilityUpdater = new AzureVisibilityUpdater(clients.main, queueOptions.VisibilityTimeoutSeconds);
 
-        return (receiver, deleter, poisonRouter);
+        IRetryQueue? retryQueue = clients.retry is not null
+            ? new AzureRetryQueue(clients.retry)
+            : null;
+
+        return new QueueComponents
+        {
+            Receiver = receiver,
+            Deleter = deleter,
+            PoisonRouter = poisonRouter,
+            VisibilityUpdater = visibilityUpdater,
+            RetryQueue = retryQueue
+        };
     }
 
-    private void InitializeQueueClients()
+    private void InitializeQueueClients(QueueProcessingOptions options)
     {
-        if (string.IsNullOrEmpty(_options.ConnectionString))
-            throw new InvalidOperationException("Azure Storage connection string is not configured");
-
-        foreach (var queueConfig in _options.Queues)
+        foreach (var queueConfig in options.Queues)
         {
-            // Create main queue client
-            var mainQueueClient = new QueueClient(_options.ConnectionString, queueConfig.Name);
+            if (_queueClients.ContainsKey(queueConfig.Name))
+                continue; // already initialized
+
+            var mainQueueClient = _client.GetQueueClient(queueConfig.Name);
             mainQueueClient.CreateIfNotExists();
 
-            // Create dead-letter queue client
             var deadLetterQueueName = queueConfig.DeadLetterQueueName ?? $"{queueConfig.Name}-poison";
-            var deadLetterQueueClient = new QueueClient(_options.ConnectionString, deadLetterQueueName);
+            var deadLetterQueueClient = _client.GetQueueClient(deadLetterQueueName);
             deadLetterQueueClient.CreateIfNotExists();
 
-            _queueClients[queueConfig.Name] = (mainQueueClient, deadLetterQueueClient);
+            QueueClient? retryQueueClient = null;
+            if (!string.IsNullOrEmpty(queueConfig.RetryQueueName))
+            {
+                retryQueueClient = _client.GetQueueClient(queueConfig.RetryQueueName);
+                retryQueueClient.CreateIfNotExists();
+            }
+
+            _queueClients[queueConfig.Name] = (mainQueueClient, deadLetterQueueClient, retryQueueClient);
         }
     }
 }

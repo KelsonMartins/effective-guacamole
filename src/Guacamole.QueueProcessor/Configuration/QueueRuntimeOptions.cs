@@ -82,7 +82,7 @@ public sealed class QueueRuntimeOptions
     public string? DeadLetterQueueName { get; set; }
 
     /// <summary>
-    /// Name of the retry queue (optional).
+    /// Name of the retry queue (optional, used for durable retry).
     /// </summary>
     public string? RetryQueueName { get; set; }
 
@@ -91,4 +91,17 @@ public sealed class QueueRuntimeOptions
     /// Only used if RetryQueueName is specified.
     /// </summary>
     public int RetryDelaySeconds { get; set; } = 60;
+
+    /// <summary>
+    /// Resilience and retry policy for this queue.
+    /// Controls in-process retries and optional durable retry queue behaviour.
+    /// </summary>
+    public RetryOptions Retry { get; set; } = new();
+
+    /// <summary>
+    /// Maximum time to wait for a full batch before flushing a partial batch.
+    /// Only relevant when using batch processors (for example, IQueueBatchProcessor&lt;TMessage&gt;).
+    /// Default: 100ms
+    /// </summary>
+    public int BatchFlushTimeoutMs { get; set; } = 100;
 }

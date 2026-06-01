@@ -1,13 +1,14 @@
 # effective-guacamole
 
-Two lightweight, zero-external-dependency .NET 10 libraries extracted from production use.
+Three .NET 10 libraries extracted from production use.
 
-Both packages target `net10.0`, carry no dependencies beyond `Microsoft.Extensions.DependencyInjection.Abstractions`, and are MIT-licensed.
+All packages target `net10.0` and are MIT-licensed.
 
 | Package | Version | Description |
 |---|---|---|
 | [`Guacamole.Mediator`](src/Guacamole.Mediator/README.md) | [![NuGet](https://img.shields.io/nuget/v/Guacamole.Mediator)](https://www.nuget.org/packages/Guacamole.Mediator) | Mediator pattern — request/response and fire-and-forget dispatch via DI |
 | [`Guacamole.ObjectMapper`](src/Guacamole.ObjectMapper/README.md) | [![NuGet](https://img.shields.io/nuget/v/Guacamole.ObjectMapper)](https://www.nuget.org/packages/Guacamole.ObjectMapper) | Convention-based and profile-driven object-to-object mapper |
+| [`Guacamole.QueueProcessor`](src/Guacamole.QueueProcessor/README.md) | [![NuGet](https://img.shields.io/nuget/v/Guacamole.QueueProcessor)](https://www.nuget.org/packages/Guacamole.QueueProcessor) | Adaptive queue processing runtime with Azure Storage Queue, Service Bus, and RabbitMQ providers |
 
 ---
 
@@ -75,15 +76,43 @@ var user = mapper.ReverseMap<User, UserDto>(dto);
 
 ---
 
+## Guacamole.QueueProcessor
+
+```bash
+dotnet add package Guacamole.QueueProcessor
+```
+
+High-throughput queue processing with strongly-typed single-message and batch processors, adaptive worker scaling, retry/dead-letter behavior, and provider-specific adapters.
+
+```csharp
+// Register Azure Storage Queue processing
+builder.Services.AddAzureQueueProcessing(builder.Configuration, qp =>
+{
+    qp.AddProcessor<OrderPlaced, OrderPlacedProcessor>("orders");
+});
+```
+
+Also supports:
+
+- `AddServiceBusQueueProcessing(...)`
+- `AddRabbitMqQueueProcessing(...)`
+
+> See [src/Guacamole.QueueProcessor/README.md](src/Guacamole.QueueProcessor/README.md) for setup, configuration, retries, batch processors, and runtime behavior.
+
+---
+
 ## Repository layout
 
 ```
 src/
   Guacamole.Mediator/        # Mediator library
   Guacamole.ObjectMapper/    # ObjectMapper library
+  Guacamole.QueueProcessor/  # Queue processing framework
 tests/
   Guacamole.Mediator.Tests/
   Guacamole.ObjectMapper.Tests/
+  Guacamole.QueueProcessor.Tests/
+  Guacamole.QueueProcessor.Benchmarks/
 ```
 
 Shared build properties (version, authors, pack settings) live in [`Directory.Build.props`](Directory.Build.props).
