@@ -212,7 +212,3 @@ Each metric is tagged with `queue.name`.
 - Queue configured in `QueueProcessing:Queues` but no processor registered for that queue.
 - Missing `QueueServiceClient` registration when using `AddAzureQueueProcessing(...)`.
 - Missing provider connection value (`ServiceBusConnectionString` or `RabbitMqUri`).
-
-## Target Framework
-
-- `net10.0`

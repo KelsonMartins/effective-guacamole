@@ -1,8 +1,5 @@
 # effective-guacamole
 
-Three .NET 10 libraries extracted from production use.
-
-All packages target `net10.0` and are MIT-licensed.
 
 | Package | Version | Description |
 |---|---|---|
