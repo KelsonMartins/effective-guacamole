@@ -25,14 +25,14 @@
   <ItemGroup>
     <!-- Core Extensions -->
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions"
-      Version="10.0.8" />
+      Version="10.0.9" />
     <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions"
-      Version="10.0.8" />
-    <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.8" />
+      Version="10.0.9" />
+    <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.9" />
     <!-- Resilience -->
-    <PackageReference Include="Microsoft.Extensions.Resilience" Version="10.6.0" />
+    <PackageReference Include="Microsoft.Extensions.Resilience" Version="10.7.0" />
     <!-- Azure Storage Queue -->
-    <PackageReference Include="Azure.Storage.Queues" Version="12.26.0" />
+    <PackageReference Include="Azure.Storage.Queues" Version="12.27.0" />
     <PackageReference Include="Microsoft.Extensions.Azure" Version="1.14.0" />
     <!-- Azure Service Bus -->
     <PackageReference Include="Azure.Messaging.ServiceBus" Version="7.20.1" />
