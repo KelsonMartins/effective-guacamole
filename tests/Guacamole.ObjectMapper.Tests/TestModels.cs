@@ -89,3 +89,26 @@ public class ProductDto
     public decimal Price { get; set; }
     public string InternalNotes { get; set; } = string.Empty;
 }
+
+// For record mapping tests
+public class PersonSource
+{
+    public Guid Id { get; set; }
+    public string FirstName { get; set; } = string.Empty;
+    public string LastName { get; set; } = string.Empty;
+    public int Age { get; set; }
+    public string Email { get; set; } = string.Empty;
+    public AddressSource? HomeAddress { get; set; }
+}
+
+public class AddressSource
+{
+    public string Street { get; set; } = string.Empty;
+    public string City { get; set; } = string.Empty;
+}
+
+public record PersonRecord(Guid Id, string FirstName, string LastName, int Age);
+
+public record PersonRecordWithAddress(Guid Id, string FirstName, int Age, AddressRecord? HomeAddress);
+
+public record AddressRecord(string Street, string City);
