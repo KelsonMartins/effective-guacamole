@@ -233,7 +233,10 @@ public sealed class ObjectMapper(MappingConfiguration configuration) : IObjectMa
             })
             .ToArray();
 
-        return ctor.Invoke(args);
+        var destination = ctor.Invoke(args);
+        MapByConvention(source, destination, visited);
+
+        return destination;
     }
 
     private void MapByConvention(object source, object destination, HashSet<object> visited)

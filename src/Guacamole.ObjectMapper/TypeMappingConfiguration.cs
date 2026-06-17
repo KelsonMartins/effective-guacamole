@@ -173,7 +173,9 @@ public sealed class TypeMappingConfiguration<TSource, TDestination>
             })
             .ToArray();
 
-        return (TDestination)ctor.Invoke(args);
+        var destination = (TDestination)ctor.Invoke(args);
+        MapToExisting(source, destination, config);
+        return destination;
     }
 
     private static bool HasParameterlessCtor(Type type)

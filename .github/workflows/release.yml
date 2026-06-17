@@ -24,7 +24,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
         with:
-          token: ${{ secrets.GH_PAT }}
+          token: ${{ github.event_name == 'push' && secrets.GH_PAT || github.token }}
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v5
