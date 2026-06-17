@@ -51,7 +51,7 @@ jobs:
           echo "NEW_VERSION=${NEW_VERSION}" >> "$GITHUB_ENV"
 
       - name: Build
-        run: dotnet build --configuration Release --no-restore /p:VersionSuffix=alpha.${{ github.run_number }}
+        run: dotnet build --configuration Release --no-restore
 
       - name: Test
         run: dotnet test --configuration Release --no-build --verbosity normal --results-directory ./TestResults --coverage --coverage-output-format cobertura --report-trx --fail-fast --output Detailed
@@ -83,6 +83,7 @@ jobs:
         uses: actions/upload-code-coverage@v1
         with:
           file: ./TestResults/merged.cobertura.xml
+          fail-on-error: false
 
       - name: Download all test results
         if: github.event_name == 'pull_request'
@@ -100,7 +101,7 @@ jobs:
 
       - name: Pack
         if: github.event_name == 'push'
-        run: dotnet pack --configuration Release --no-build --output ./artifacts /p:VersionSuffix=alpha.${{ github.run_number }}
+        run: dotnet pack --configuration Release --no-build --output ./artifacts
 
       - name: NuGet login (OIDC → temp API key)
         if: github.event_name == 'push'
@@ -113,10 +114,9 @@ jobs:
         if: github.event_name == 'push'
         env:
           GH_TOKEN: ${{ github.token }}
-          RUN_NUMBER: ${{ github.run_number }}
         run: |
-          gh release create "v${NEW_VERSION}-alpha.${RUN_NUMBER}" ./artifacts/*.nupkg \
-            --title "v${NEW_VERSION}-alpha.${RUN_NUMBER}" \
+          gh release create "v${NEW_VERSION}" ./artifacts/*.nupkg \
+            --title "v${NEW_VERSION}" \
             --generate-notes \
             --prerelease
 
