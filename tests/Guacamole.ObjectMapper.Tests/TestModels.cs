@@ -109,6 +109,22 @@ public class AddressSource
 
 public record PersonRecord(Guid Id, string FirstName, string LastName, int Age);
 
+// For constructor parameter resolution order tests
+public class SourceWithFewProps
+{
+    public string Name { get; set; } = string.Empty;
+    // intentionally omits Score and Label
+}
+
+/// <summary>Ctor has an optional parameter with an explicit default.</summary>
+public record RecordWithOptionalParam(
+    string Name,
+    int Score = 42,
+    string Label = "default-label");
+
+/// <summary>Ctor has a required parameter with no default (must fall back to default(T)).</summary>
+public record RecordWithRequiredParam(string Name, int RequiredScore, string? RequiredLabel);
+
 public record PersonRecordWithAddress(Guid Id, string FirstName, int Age, AddressRecord? HomeAddress);
 
 public record AddressRecord(string Street, string City);

@@ -177,7 +177,8 @@ public sealed class TypeMappingConfiguration<TSource, TDestination>
     }
 
     private static bool HasParameterlessCtor(Type type)
-        => type.GetConstructor(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance, Type.EmptyTypes) != null;
+        => type.GetConstructors(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
+               .Any(c => c.GetParameters().Length == 0);
 
     private static object? GetDefaultValue(Type type)
         => type.IsValueType ? Activator.CreateInstance(type) : null;

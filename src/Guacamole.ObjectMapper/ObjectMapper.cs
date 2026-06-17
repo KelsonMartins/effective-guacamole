@@ -185,7 +185,7 @@ public sealed class ObjectMapper(MappingConfiguration configuration) : IObjectMa
 
         if (HasParameterlessCtor(destinationType))
         {
-            var destination = Activator.CreateInstance(destinationType)!;
+            var destination = Activator.CreateInstance(destinationType, nonPublic: true)!;
             MapByConvention(source, destination, visited);
             return destination;
         }
@@ -218,7 +218,12 @@ public sealed class ObjectMapper(MappingConfiguration configuration) : IObjectMa
                             return value;
 
                         try { return MapInternal(value, param.ParameterType, visited); }
-                        catch { /* fall through to default */ }
+                        catch (InvalidOperationException ex)
+                        {
+                            throw new InvalidOperationException(
+                                $"Failed to map constructor parameter '{param.Name}' of type '{param.ParameterType.Name}' " +
+                                $"on '{destinationType.Name}'.", ex);
+                        }
                     }
                 }
 
@@ -330,7 +335,8 @@ public sealed class ObjectMapper(MappingConfiguration configuration) : IObjectMa
     }
 
     private static bool HasParameterlessCtor(Type type)
-        => type.GetConstructor(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance, Type.EmptyTypes) != null;
+        => type.GetConstructors(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
+               .Any(c => c.GetParameters().Length == 0);
 
     private static object CreateDefault(Type type)
     {

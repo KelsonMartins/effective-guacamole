@@ -123,4 +123,44 @@ public class RecordMappingTests
         await Assert.That(record.FirstName).IsNull();
         await Assert.That(record.Age).IsEqualTo(0);
     }
+
+    /// <summary>
+    /// When the source has no property matching an optional constructor parameter,
+    /// the parameter's explicit default value must be used.
+    /// </summary>
+    [Test]
+    public async Task MapByConstructor_OptionalParam_NoMatchingSourceProp_UsesExplicitDefault()
+    {
+        var builder = new MappingConfigurationBuilder();
+        var mapper = new ObjectMapper(builder.Build());
+
+        // Source has Name but not Score or Label.
+        var source = new SourceWithFewProps { Name = "Alice" };
+
+        var record = mapper.Map<RecordWithOptionalParam>(source);
+
+        await Assert.That(record.Name).IsEqualTo("Alice");
+        await Assert.That(record.Score).IsEqualTo(42);            // explicit default
+        await Assert.That(record.Label).IsEqualTo("default-label"); // explicit default
+    }
+
+    /// <summary>
+    /// When the source has no property matching a required (no-default) constructor parameter,
+    /// the mapper must fall back to default(T): 0 for value types, null for reference types.
+    /// </summary>
+    [Test]
+    public async Task MapByConstructor_RequiredParam_NoMatchingSourceProp_UsesDefaultOfT()
+    {
+        var builder = new MappingConfigurationBuilder();
+        var mapper = new ObjectMapper(builder.Build());
+
+        // Source has Name but not RequiredScore or RequiredLabel.
+        var source = new SourceWithFewProps { Name = "Bob" };
+
+        var record = mapper.Map<RecordWithRequiredParam>(source);
+
+        await Assert.That(record.Name).IsEqualTo("Bob");
+        await Assert.That(record.RequiredScore).IsEqualTo(0);   // default(int)
+        await Assert.That(record.RequiredLabel).IsNull();        // default(string?)
+    }
 }

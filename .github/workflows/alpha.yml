@@ -7,7 +7,7 @@ on:
   pull_request:
     branches:
       - develop
-    types: [opened, synchronize, closed]
+    types: [opened, synchronize]
 
 permissions:
   contents: write
@@ -23,6 +23,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+        with:
+          token: ${{ secrets.GH_PAT }}
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v5
@@ -52,7 +54,7 @@ jobs:
         run: dotnet build --configuration Release --no-restore /p:VersionSuffix=alpha.${{ github.run_number }}
 
       - name: Test
-        run: dotnet test --configuration Release --no-build --verbosity normal --results-directory ./TestResults --coverage --report-trx --fail-fast --output Detailed
+        run: dotnet test --configuration Release --no-build --verbosity normal --results-directory ./TestResults --coverage --coverage-output-format cobertura --report-trx --fail-fast --output Detailed
 
       - name: Upload test results
         if: always()
@@ -66,7 +68,13 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: coverage-alpha.${{ github.run_number }}
-          path: ./TestResults/*.coverage
+          path: ./TestResults/**/*.cobertura.xml
+
+      - name: Upload code coverage report to PR
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-code-coverage@v1
+        with:
+          file: ./TestResults/**/*.cobertura.xml
 
       - name: Download all test results
         if: github.event_name == 'pull_request'
@@ -83,9 +91,11 @@ jobs:
           comment_mode: always
 
       - name: Pack
+        if: github.event_name == 'push'
         run: dotnet pack --configuration Release --no-build --output ./artifacts /p:VersionSuffix=alpha.${{ github.run_number }}
 
       - name: NuGet login (OIDC → temp API key)
+        if: github.event_name == 'push'
         uses: NuGet/login@v1
         id: login
         with:
@@ -103,6 +113,7 @@ jobs:
             --prerelease
 
       - name: Push to NuGet.org
+        if: github.event_name == 'push'
         run: |
           dotnet nuget push ./artifacts/*.nupkg \
             --api-key ${{steps.login.outputs.NUGET_API_KEY}} \
