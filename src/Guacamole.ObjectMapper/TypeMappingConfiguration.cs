@@ -75,9 +75,14 @@ public sealed class TypeMappingConfiguration<TSource, TDestination>
         if (source is not TSource typedSource)
             throw new ArgumentException($"Source must be of type '{typeof(TSource).Name}'.", nameof(source));
 
-        var destination = (TDestination)Activator.CreateInstance(typeof(TDestination), nonPublic: true)!;
-        MapToExisting(typedSource, destination, config);
-        return destination;
+        if (HasParameterlessCtor(typeof(TDestination)))
+        {
+            var destination = (TDestination)Activator.CreateInstance(typeof(TDestination), nonPublic: true)!;
+            MapToExisting(typedSource, destination, config);
+            return destination;
+        }
+
+        return MapViaConstructor(typedSource, config);
     }
 
     /// <summary>Maps <paramref name="source"/> onto an existing <paramref name="destination"/> instance.</summary>
@@ -116,6 +121,69 @@ public sealed class TypeMappingConfiguration<TSource, TDestination>
 
         ApplyConventionMapping(source, destination, config);
     }
+
+    private TDestination MapViaConstructor(TSource source, MappingConfiguration config)
+    {
+        var ctor = typeof(TDestination).GetConstructors(BindingFlags.Public | BindingFlags.Instance)
+            .OrderByDescending(c => c.GetParameters().Length)
+            .FirstOrDefault()
+            ?? throw new InvalidOperationException(
+                $"No public constructor found for type '{typeof(TDestination).Name}'.");
+
+        var memberMappingsByDest = _memberMappings
+            .ToDictionary(m => m.DestinationMember, StringComparer.OrdinalIgnoreCase);
+
+        var sourceProps = typeof(TSource).GetProperties(BindingFlags.Public | BindingFlags.Instance)
+            .Where(p => p.CanRead)
+            .ToDictionary(p => p.Name, StringComparer.OrdinalIgnoreCase);
+
+        var args = ctor.GetParameters()
+            .Select(param =>
+            {
+                var paramName = param.Name!;
+
+                if (memberMappingsByDest.TryGetValue(paramName, out var memberMapping))
+                {
+                    if (memberMapping.SourceConverter != null)
+                        return memberMapping.SourceConverter(source);
+
+                    if (memberMapping.SourceExpression != null)
+                    {
+                        var compiled = memberMapping.CompiledExpression ??= memberMapping.SourceExpression.Compile();
+                        return compiled.DynamicInvoke(source)
+                            ?? (param.HasDefaultValue ? param.DefaultValue : GetDefaultValue(param.ParameterType));
+                    }
+                }
+
+                if (!_ignoredMembers.Contains(paramName) && sourceProps.TryGetValue(paramName, out var sourceProp))
+                {
+                    var value = sourceProp.GetValue(source);
+                    if (value != null)
+                    {
+                        if (param.ParameterType.IsAssignableFrom(sourceProp.PropertyType))
+                            return value;
+
+                        var mapped = MapComplexObject(value, param.ParameterType, config);
+                        if (mapped != null)
+                            return mapped;
+                    }
+                }
+
+                return param.HasDefaultValue ? param.DefaultValue : GetDefaultValue(param.ParameterType);
+            })
+            .ToArray();
+
+        var destination = (TDestination)ctor.Invoke(args);
+        MapToExisting(source, destination, config);
+        return destination;
+    }
+
+    private static bool HasParameterlessCtor(Type type)
+        => type.GetConstructors(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
+               .Any(c => c.GetParameters().Length == 0);
+
+    private static object? GetDefaultValue(Type type)
+        => type.IsValueType ? Activator.CreateInstance(type) : null;
 
     private void ApplyConventionMapping(TSource source, TDestination destination, MappingConfiguration config)
     {

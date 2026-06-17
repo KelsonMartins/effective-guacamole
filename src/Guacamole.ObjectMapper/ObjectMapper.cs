@@ -18,7 +18,7 @@ public sealed class ObjectMapper(MappingConfiguration configuration) : IObjectMa
     public TDestination Map<TDestination>(object? source) where TDestination : class
     {
         if (source == null)
-            return (TDestination)Activator.CreateInstance(typeof(TDestination), nonPublic: true)!;
+            return (TDestination)CreateDefault(typeof(TDestination));
 
         return (TDestination)MapInternal(source, typeof(TDestination), new HashSet<object>(ReferenceEqualityComparer.Instance));
     }
@@ -29,7 +29,7 @@ public sealed class ObjectMapper(MappingConfiguration configuration) : IObjectMa
         where TDestination : class
     {
         if (source == null)
-            return (TDestination)Activator.CreateInstance(typeof(TDestination), nonPublic: true)!;
+            return (TDestination)CreateDefault(typeof(TDestination));
 
         return (TDestination)MapInternal(source, typeof(TDestination), new HashSet<object>(ReferenceEqualityComparer.Instance));
     }
@@ -67,7 +67,7 @@ public sealed class ObjectMapper(MappingConfiguration configuration) : IObjectMa
         where TDestination : class
     {
         if (destination == null)
-            return (TSource)Activator.CreateInstance(typeof(TSource), nonPublic: true)!;
+            return (TSource)CreateDefault(typeof(TSource));
 
         return (TSource)MapInternal(destination, typeof(TSource), new HashSet<object>(ReferenceEqualityComparer.Instance));
     }
@@ -75,7 +75,7 @@ public sealed class ObjectMapper(MappingConfiguration configuration) : IObjectMa
     private object MapInternal(object source, Type destinationType, HashSet<object> visited)
     {
         if (visited.Contains(source))
-            return Activator.CreateInstance(destinationType)!;
+            return CreateDefault(destinationType);
 
         visited.Add(source);
         try
@@ -183,8 +183,59 @@ public sealed class ObjectMapper(MappingConfiguration configuration) : IObjectMa
             throw new InvalidOperationException(
                 $"Cannot map to value type or string '{destinationType.Name}' using convention mapping. Register an explicit mapping profile.");
 
-        var destination = Activator.CreateInstance(destinationType)!;
+        if (HasParameterlessCtor(destinationType))
+        {
+            var destination = Activator.CreateInstance(destinationType, nonPublic: true)!;
+            MapByConvention(source, destination, visited);
+            return destination;
+        }
+
+        return MapByConstructor(source, destinationType, visited);
+    }
+
+    private object MapByConstructor(object source, Type destinationType, HashSet<object> visited)
+    {
+        var ctor = destinationType.GetConstructors(BindingFlags.Public | BindingFlags.Instance)
+            .OrderByDescending(c => c.GetParameters().Length)
+            .FirstOrDefault()
+            ?? throw new InvalidOperationException(
+                $"No public constructor found for type '{destinationType.Name}'.");
+
+        var sourceProps = source.GetType()
+            .GetProperties(BindingFlags.Public | BindingFlags.Instance)
+            .Where(p => p.CanRead)
+            .ToDictionary(p => p.Name, StringComparer.OrdinalIgnoreCase);
+
+        var args = ctor.GetParameters()
+            .Select(param =>
+            {
+                if (sourceProps.TryGetValue(param.Name!, out var sourceProp))
+                {
+                    var value = sourceProp.GetValue(source);
+                    if (value != null)
+                    {
+                        if (param.ParameterType.IsAssignableFrom(sourceProp.PropertyType))
+                            return value;
+
+                        try { return MapInternal(value, param.ParameterType, visited); }
+                        catch (InvalidOperationException ex)
+                        {
+                            throw new InvalidOperationException(
+                                $"Failed to map constructor parameter '{param.Name}' of type '{param.ParameterType.Name}' " +
+                                $"on '{destinationType.Name}'.", ex);
+                        }
+                    }
+                }
+
+                return param.HasDefaultValue
+                    ? param.DefaultValue
+                    : GetDefaultValue(param.ParameterType);
+            })
+            .ToArray();
+
+        var destination = ctor.Invoke(args);
         MapByConvention(source, destination, visited);
+
         return destination;
     }
 
@@ -285,4 +336,28 @@ public sealed class ObjectMapper(MappingConfiguration configuration) : IObjectMa
         var primitives = new[] { typeof(string), typeof(decimal), typeof(DateTime), typeof(DateTimeOffset), typeof(Guid) };
         return (s.IsPrimitive || primitives.Contains(s)) && (d.IsPrimitive || primitives.Contains(d));
     }
+
+    private static bool HasParameterlessCtor(Type type)
+        => type.GetConstructors(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
+               .Any(c => c.GetParameters().Length == 0);
+
+    private static object CreateDefault(Type type)
+    {
+        if (HasParameterlessCtor(type))
+            return Activator.CreateInstance(type, nonPublic: true)!;
+
+        var ctor = type.GetConstructors(BindingFlags.Public | BindingFlags.Instance)
+            .OrderByDescending(c => c.GetParameters().Length)
+            .FirstOrDefault()
+            ?? throw new InvalidOperationException($"No public constructor found for type '{type.Name}'.");
+
+        var args = ctor.GetParameters()
+            .Select(p => p.HasDefaultValue ? p.DefaultValue : GetDefaultValue(p.ParameterType))
+            .ToArray();
+
+        return ctor.Invoke(args);
+    }
+
+    private static object? GetDefaultValue(Type type)
+        => type.IsValueType ? Activator.CreateInstance(type) : null;
 }
