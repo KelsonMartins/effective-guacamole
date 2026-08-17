@@ -1,6 +1,6 @@
 <Project>
   <PropertyGroup>
-    <VersionPrefix>1.5.8</VersionPrefix>
+    <VersionPrefix>1.5.9</VersionPrefix>
     <Authors>Kelson Martins</Authors>
     <Company>KelsonMartins</Company>
     <Copyright>Copyright © Kelson Martins 2026</Copyright>
